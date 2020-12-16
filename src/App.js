@@ -4,9 +4,15 @@ import { Query } from 'react-apollo';
 import client from './Client';
 import { SEARCH_REPOSITORIES } from './graphql';
 
-const StarButton = props => {
-  const totalCount = props.node.stargazers.totalCount;
-  return <button>{totalCount === 1 ? "1 star" : `${totalCount} stars`}</button>
+const StarButton = ({ node }) => {
+  const totalCount = node.stargazers.totalCount;
+  const viewerHasStarred = node.viewerHasStarred;
+  const starCount = totalCount === 1 ? "1 star" : `${totalCount} stars`
+  return (
+    <button>
+      {starCount} | {viewerHasStarred ? 'stared' : '-'}
+    </button>
+  )
 }
 
 const PER_PAGE = 5;
