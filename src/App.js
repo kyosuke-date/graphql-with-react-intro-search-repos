@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ApolloProvider, Mutation, Query } from 'react-apollo';
 import client from './Client';
 import { ADD_STAR, REMOVE_STAR, SEARCH_REPOSITORIES } from './graphql';
@@ -13,7 +13,27 @@ const StarButton = ({ node, query, first, last, before, after }) => {
       onClick={
         () => {
           addOrRemoveStar({
-            variables: { input: { starrableId: node.id }}
+            variables: { input: { starrableId: node.id }},
+            update: (store, { data: { addStar, removeStar }}) => {
+              const { starrable } = addStar || removeStar
+              console.log(starrable);
+              const data = store.readQuery({
+                query: SEARCH_REPOSITORIES,
+                variables: { query, first, last, before, after }
+              })
+              const edges = data.search.edges;
+              const newEdges = edges.map(edge => {
+                if(edge.node.id === node.id) {
+                  const totalCount = edge.node.stargazers.totalCount;
+                  const diff = starrable.viewerHasStarred ? 1 : -1;
+                  const newTotalCount = totalCount + diff;
+                  edge.node.stargazers.totalCount = newTotalCount;
+                }
+                return edge;
+              })
+              data.search.edges = newEdges;
+              store.writeQuery({ query: SEARCH_REPOSITORIES, data });
+            }
           })
         }
       }>
@@ -24,14 +44,6 @@ const StarButton = ({ node, query, first, last, before, after }) => {
   return (
     <Mutation 
     mutation={viewerHasStarred ? REMOVE_STAR : ADD_STAR }
-    refetchQueries={
-      [
-        {
-          query: SEARCH_REPOSITORIES,
-          variables: { query, first, last, before, after }
-        }
-      ]
-    }
     >
       {
         addOrRemoveStar => <StarStatus addOrRemoveStar={addOrRemoveStar} />
@@ -46,18 +58,19 @@ const DEFAULT_STATE = {
     after: null,
     last: null,
     before: null,
-    query: "フロントエンドエンジニア"
+    query: ""
 }
 
 const App = () => {
   const [variables, setVariables] = useState(DEFAULT_STATE);
+  const myRef = useRef(null);
   const { query, first, last, before, after } = variables;
 
-  const handleChange = (e) => {
-    setVariables({
-      ...DEFAULT_STATE,
-      query: e.target.value
-    })
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setVariables({...variables, query: myRef.current.value})
+    myRef.current.focus();
   }
 
   const goNext = (search) => {
@@ -81,8 +94,10 @@ const App = () => {
 
   return (
     <ApolloProvider client={client}>
-      <form>
-        <input value={query} onChange={handleChange} />
+      <form onSubmit={handleSubmit}>
+        {/* <input value={query} onChange={handleChange} /> */}
+        <input ref={myRef} />
+        <input type="submit" value="Submit" />
       </form>
       <Query 
       query={SEARCH_REPOSITORIES} 
